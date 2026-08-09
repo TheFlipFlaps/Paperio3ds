@@ -18,12 +18,29 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v4
 
+      - name: Work around devkitPro's Cloudflare 403 (known upstream issue)
+        run: |
+          # devkitPro's Cloudflare WAF currently blocks pacman's default
+          # user-agent, returning 403 on package downloads. Spoofing a
+          # normal browser user-agent via a custom XferCommand fixes it.
+          # See: https://github.com/devkitPro/pacman/issues/62
+          PACMAN_CONF=$(find / -xdev -name pacman.conf 2>/dev/null | grep devkitpro | head -1)
+          if [ -z "$PACMAN_CONF" ]; then
+            PACMAN_CONF=$(find / -name pacman.conf 2>/dev/null | head -1)
+          fi
+          echo "Using pacman.conf at: $PACMAN_CONF"
+          sed -i '/^\[options\]/a XferCommand = /usr/bin/curl -L -C - -f --retry 3 --retry-delay 2 --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" -o %o %u' "$PACMAN_CONF"
+          cat "$PACMAN_CONF"
+
       - name: Install 3DS dev packages
         run: |
-          # Full system upgrade first -- prevents mismatched versions between
-          # citro2d/citro3d/libctru, which shows up on-device as a bogus
-          # near-null pointer crash ("An exception occurred", Translation - Section).
-          dkp-pacman -Syu --noconfirm
+          # Retry a few times in case the block is intermittent/IP-based
+          # rather than purely user-agent based.
+          for i in 1 2 3; do
+            dkp-pacman -Syu --noconfirm && break
+            echo "Attempt $i failed, retrying in 10s..."
+            sleep 10
+          done
           dkp-pacman -S --noconfirm 3ds-dev citro2d citro3d
 
       - name: Build
