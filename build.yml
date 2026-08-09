@@ -1,0 +1,36 @@
+name: Build 3DS homebrew app
+
+# Compiles the game automatically whenever you push to the repo, or when
+# you trigger it manually from the Actions tab. Produces a downloadable
+# "paperio3ds.3dsx" you can copy straight to your SD card's /3ds/ folder.
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: devkitpro/devkitarm:latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Install 3DS dev packages
+        run: |
+          dkp-pacman -Sy --noconfirm
+          dkp-pacman -S --noconfirm 3ds-dev citro2d citro3d
+
+      - name: Build
+        run: make
+
+      - name: Upload compiled .3dsx
+        uses: actions/upload-artifact@v4
+        with:
+          name: paperio3ds-build
+          path: |
+            paperio3ds.3dsx
+            paperio3ds.smdh
+          if-no-files-found: error
