@@ -20,7 +20,10 @@ jobs:
 
       - name: Install 3DS dev packages
         run: |
-          dkp-pacman -Sy --noconfirm
+          # Full system upgrade first -- prevents mismatched versions between
+          # citro2d/citro3d/libctru, which shows up on-device as a bogus
+          # near-null pointer crash ("An exception occurred", Translation - Section).
+          dkp-pacman -Syu --noconfirm
           dkp-pacman -S --noconfirm 3ds-dev citro2d citro3d
 
       - name: Build
